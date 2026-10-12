@@ -83,7 +83,7 @@ Treat the following rules as the source contract:
 - Cancellations arrive as records whose `status` is `cancelled`.
 - A booking missing from a later file has not been deleted.
 - An invalid update must be rejected and must not replace an existing valid booking, even if its `updated_at` appears newer.
-- Input timestamps are ISO 8601 UTC timestamps. Accept UTC expressed as `Z` or an explicit `+00:00` offset and normalize consistently.
+- Input timestamps are ISO 8601 UTC timestamps. Accept UTC expressed as `Z` or an explicit `+00:00` offset and normalize consistently. Reject timestamps with any other offset (for example `+02:00`) or with no offset.
 - The only accepted statuses are `confirmed`, `completed`, and `cancelled`.
 
 Validate each booking row before applying source-version rules. At minimum, reject a row when:
@@ -100,8 +100,8 @@ You may add sensible validation rules or choose how to report multiple failures 
 
 Booking business-rule failures belong in `rejected_records` and do not fail the run.
 Missing any supplied required file is a fatal source-structure error.
-Malformed CSV structure, row width, or quoting, invalid headers, and duplicate
-depot IDs are also fatal. A blank depot ID may also be treated as fatal.
+Malformed CSV structure, row width, or quoting, invalid headers, duplicate
+depot IDs, and blank depot IDs are also fatal.
 
 Check the complete input for fatal source-structure errors **before any output
 mutation**. On such an error, exit non-zero, add no successful-run audit rows,
@@ -147,45 +147,15 @@ Repeated successful runs must leave logical current bookings, logical rejected
 records, and the daily report identical. Successful audit rows may append per execution.
 Rejection identity is `<source_filename>:<1-based data-row number>`, excluding the header.
 
-### Exact audit contract
+### Audit contract
 
-These required `processing_audit` fields have fixed meanings, not candidate-defined
-"accepted" counts. Counts apply to each booking file within one execution.
-
-| Required field | DuckDB type | Meaning |
-|---|---|---|
-| `run_id` | `VARCHAR` | One execution identifier shared by all booking files in that execution. |
-| `source_filename` | `VARCHAR` | Booking filename, without its directory. |
-| `input_row_count` | `BIGINT` | Physical booking data rows read, excluding the header. |
-| `valid_row_count` | `BIGINT` | Rows passing all booking business validation. |
-| `rejected_row_count` | `BIGINT` | Rows failing business validation and written once logically to `rejected_records`. |
-| `applied_row_count` | `BIGINT` | Valid rows that insert a new current booking or a strictly newer current version during that execution. |
-| `duplicate_row_count` | `BIGINT` | Valid rows exactly matching a valid row encountered earlier in the execution, or exactly matching current state. No state change. |
-| `stale_row_count` | `BIGINT` | Valid non-duplicate rows older than current state. No state change. |
-| `run_started_at` | `TIMESTAMPTZ` | UTC execution start timestamp shared by all files in the execution. |
-
-All fields are NOT NULL. The logical and physical primary key is
-`(run_id, source_filename)`. Write one row per successful run/file and no rows for
-a failed execution. There is no required depot audit row.
-
-For supplied data, classify each row in this order: validate, exact duplicate
-within the run/current state, stale, then applied. Compare all seven booking values
-for duplicates, with valid UTC timestamps normalized consistently. A valid row
-encountered earlier still counts for duplicate detection after a newer version replaces it.
-
-For each file and execution, the supplied fixtures satisfy:
-
-```text
-input_row_count = valid_row_count + rejected_row_count
-valid_row_count = applied_row_count + duplicate_row_count + stale_row_count
-```
-
-On a fresh database's first execution, totals are **28 input, 19 valid, 9 rejected,
-15 applied, 2 duplicate, and 2 stale**. A repeated execution against completed
-state must have an applied total of **0**, with both accounting identities intact.
-No separate fixed repeat-run duplicate/stale split is required beyond the algorithm
-and invariants above. Equal-timestamp differing records are outside the supplied data.
-Document a deterministic policy for them.
+`processing_audit` has an exact field-by-field contract: fixed count meanings, a
+required classification order (validate, then duplicate, then stale, then applied),
+and two per-file accounting identities that must hold on every execution. The
+precise definitions, the expected first-run totals, and the repeat-run rules are
+specified once in the
+[acceptance criteria](docs/acceptance-criteria.md#processing_audit). Read them
+before implementing; they are graded as written.
 
 ## What to build
 

@@ -53,7 +53,7 @@ booking_id,pickup_depot_id,dropoff_depot_id,pickup_at,dropoff_at,status,updated_
 
 Missing any supplied required file, malformed CSV structure, incorrect row width,
 malformed quoting, invalid headers, or duplicate depot IDs are **fatal source-structure
-errors**. A blank depot ID may also be treated as fatal.
+errors**. A blank depot ID is also fatal.
 
 Check the complete input for these errors **before any output mutation**.
 On a fatal source-structure error:
@@ -70,6 +70,7 @@ fail the run. Reject missing booking IDs, unknown pickup or drop-off depots,
 invalid UTC timestamps, pickup at or after drop-off, and unsupported statuses.
 Accept only `confirmed`, `completed`, or `cancelled` statuses.
 Accept ISO 8601 UTC timestamps written with `Z` or `+00:00`, and normalize consistently.
+Reject timestamps with any other offset (for example `+02:00`) or with no offset.
 Preserve rejected values as their original strings.
 
 Full disaster recovery for unexpected infrastructure failure or process termination
