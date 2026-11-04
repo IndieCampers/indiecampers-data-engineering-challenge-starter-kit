@@ -182,6 +182,7 @@ Add a solution section to this README, or add a clearly linked solution document
 
 - Setup and exact run commands.
 - Design decisions and assumptions.
+- How you approach missing or incomplete booking data. For example, a row arrives with a blank `dropoff_depot_id` — explain what your pipeline does with it and why.
 - How you implement the required audit definitions and accounting identities.
 - How you handle idempotency, duplicates, stale records, invalid updates, and same-version conflicts.
 - Test strategy and commands.
